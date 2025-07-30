@@ -4,9 +4,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login
+from django.views.decorators.csrf import csrf_exempt
 from .serializers import UserRegistrationSerializer, UserLoginSerializer, UserSerializer
 
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
@@ -21,6 +23,7 @@ def register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -37,6 +40,7 @@ def login_view(request):
 
 
 @api_view(['GET'])
+@permission_classes([])  # Use default authentication from settings
 def profile(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)

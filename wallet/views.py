@@ -1,7 +1,8 @@
 import stripe
 from django.conf import settings
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from decimal import Decimal
 from .models import WalletTransaction
@@ -11,6 +12,7 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_checkout_session(request):
     serializer = TopUpSerializer(data=request.data)
     if serializer.is_valid():
@@ -21,7 +23,7 @@ def create_checkout_session(request):
                 payment_method_types=['card'],
                 line_items=[{
                     'price_data': {
-                        'currency': 'usd',
+                        'currency': 'aed',
                         'product_data': {
                             'name': 'Wallet Top-up',
                         },
@@ -58,6 +60,7 @@ def create_checkout_session(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def transaction_history(request):
     transactions = WalletTransaction.objects.filter(user=request.user)
     serializer = WalletTransactionSerializer(transactions, many=True)

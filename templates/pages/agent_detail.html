@@ -1,0 +1,1177 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ agent.name }}{% endblock %}
+
+{% block content %}
+<div class="agent-container">
+    <!-- Agent Header -->
+    <div class="agent-header">
+        <div>
+            <h1 class="agent-title">{{ agent.name }}</h1>
+            <p class="agent-subtitle">{{ agent.short_description }}</p>
+        </div>
+        <div class="header-controls">
+            <!-- Wallet Card Component -->
+            <div class="wallet-card widget-small">
+                <div class="wallet-header">
+                    <h3 class="wallet-title">Your Wallet</h3>
+                    <div class="wallet-icon">💳</div>
+                </div>
+                <div class="balance-display">
+                    <div class="balance-amount">
+                        <span id="wallet-balance">{{ user_wallet_balance|floatformat:2 }}</span> AED
+                    </div>
+                    <div class="balance-label">Available Balance</div>
+                </div>
+                <button type="button" class="wallet-topup-btn" onclick="window.location.href='/wallet/'">
+                    💳 Top Up Wallet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Grid -->
+    <div class="agent-grid">
+        <!-- Agent Form Widget -->
+        <div class="agent-widget widget-large" style="flex: 1; margin-right: clamp(0px, var(--spacing-lg), 2vw);">
+            <div class="widget-header">
+                <h3 class="widget-title">
+                    <span class="widget-icon">{{ agent.icon|default:"🤖" }}</span>
+                    {{ agent.name }} Details
+                </h3>
+            </div>
+            <div class="widget-content">
+                <form method="POST" id="agent-form">
+                    {% csrf_token %}
+                    <!-- Dynamic form fields will be rendered here by JavaScript -->
+                    <div id="dynamic-form-fields"></div>
+                    
+                    <div style="margin-top: var(--spacing-lg);">
+                        <button type="submit" class="btn btn-primary btn-full" id="processButton">
+                            🚀 Generate {{ agent.name }} ({{ agent.price }} AED)
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- How It Works Widget -->
+        <div class="agent-widget widget-small" style="min-width: min(280px, 100%); max-width: min(280px, 100%); margin-left: auto;">
+            <div class="widget-header">
+                <h3 class="widget-title">
+                    <span class="widget-icon">ℹ️</span>
+                    How It Works
+                </h3>
+            </div>
+            <div class="widget-content">
+                <ol class="info-list">
+                    <li>Choose your platform and language</li>
+                    <li>Describe your content and audience</li>
+                    <li>Get AI-generated results</li>
+                    <li>Copy or download your content</li>
+                </ol>
+                
+                <!-- Other Agents Button -->
+                <button class="quick-agent-toggle btn btn-secondary btn-full" onclick="window.location.href='/agents/'" 
+                        title="Explore other AI agents"
+                        style="margin-top: var(--spacing-md);">
+                    <span class="toggle-icon" aria-hidden="true">🚀</span>
+                    <span class="toggle-text">Explore Other Agents</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results -->
+    <div class="agent-grid">
+        <div id="results-container" class="agent-widget results-card" style="width: 100%; display: none;">
+            <div class="results-header">
+                <h3 class="widget-title">
+                    <span class="widget-icon">📊</span>
+                    Generated Results
+                </h3>
+                <span class="status-badge" style="background: var(--success); color: white; padding: 4px 8px; border-radius: var(--radius-sm); font-size: 12px;">Success</span>
+            </div>
+            
+            <div class="results-content" id="results-content">
+                <!-- Results will be populated here -->
+            </div>
+            
+            <div class="action-buttons">
+                <button onclick="copyResults()" class="btn btn-primary">📋 Copy Results</button>
+                <button onclick="downloadResults()" class="btn btn-secondary">💾 Download</button>
+                <button onclick="resetForm()" class="btn btn-secondary">🔄 New Request</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Agent Frontend - Matching Social Ads Design */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary: #000000;
+    --surface: #ffffff;
+    --surface-variant: #f8fafc;
+    --background: #f3f4f6;
+    --outline: #e4e7eb;
+    --outline-variant: #e1e4e7;
+    --on-surface: #1a1a1a;
+    --on-surface-variant: #6b7280;
+    --success: #10b981;
+    --error: #ef4444;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+html {
+    scrollbar-gutter: stable;
+}
+
+body {
+    background: var(--background);
+    color: var(--on-surface);
+    line-height: 1.5;
+    font-weight: 400;
+    margin: 0;
+    padding: 0;
+}
+
+/* Layout */
+.agent-container {
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+    max-width: 1600px;
+}
+
+.agent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xl);
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.agent-grid {
+    display: flex;
+    gap: var(--spacing-lg);
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Typography */
+.agent-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--on-surface);
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.agent-subtitle {
+    font-size: 16px;
+    color: var(--on-surface-variant);
+    margin: 4px 0 0 0;
+}
+
+/* Widgets */
+.agent-widget {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    border: 1px solid var(--outline-variant);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--outline-variant);
+}
+
+.widget-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--on-surface);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.widget-icon {
+    font-size: 20px;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-variant);
+}
+
+.widget-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+/* Widget Sizes */
+.widget-large {
+    flex: 1;
+    min-width: 400px;
+}
+
+.widget-small {
+    flex: 0 0 280px;
+}
+
+.widget-wide {
+    flex: 1 1 100%;
+    width: 100%;
+}
+
+/* Wallet Card */
+.wallet-card {
+    background: linear-gradient(135deg, #000000 0%, #333333 100%);
+    color: white;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    border: none;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 0;
+    min-height: auto;
+}
+
+.wallet-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(30px, -30px);
+}
+
+.wallet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.wallet-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.wallet-icon {
+    font-size: 20px;
+}
+
+.wallet-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    position: relative;
+    z-index: 1;
+}
+
+.balance-display {
+    margin-bottom: 0;
+}
+
+.balance-amount {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0;
+    letter-spacing: -0.5px;
+}
+
+.balance-label {
+    font-size: 12px;
+    opacity: 0.8;
+    font-weight: 400;
+}
+
+.wallet-topup-btn {
+    width: 100%;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 12px;
+}
+
+.wallet-topup-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Form Sections */
+.section-container {
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-lg);
+    background: var(--surface-variant);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--outline-variant);
+}
+
+.section-subtitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--on-surface);
+    margin: 0 0 var(--spacing-lg) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.section-subtitle::before {
+    content: '';
+    width: 3px;
+    height: 16px;
+    background: var(--primary);
+    border-radius: 2px;
+}
+
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-label {
+    display: block;
+    font-weight: 500;
+    color: var(--on-surface);
+    margin-bottom: var(--spacing-sm);
+    font-size: 14px;
+}
+
+.form-input, .form-textarea, .form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--outline-variant);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--surface);
+    color: var(--on-surface);
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.form-input:focus, .form-textarea:focus, .form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.form-input:hover, .form-textarea:hover, .form-control:hover {
+    border-color: var(--on-surface-variant);
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.form-help {
+    color: var(--on-surface-variant);
+    font-size: 0.875rem;
+    margin-top: var(--spacing-xs);
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+    min-height: 44px;
+}
+
+.btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: var(--surface);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #333;
+}
+
+.btn-secondary {
+    background: var(--surface);
+    color: var(--on-surface);
+    border: 2px solid var(--outline);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--surface-variant);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-full {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Info List */
+.info-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: step-counter;
+}
+
+.info-list li {
+    padding: var(--spacing-sm) 0;
+    color: var(--on-surface-variant);
+    font-size: 14px;
+    border-bottom: 1px solid var(--outline-variant);
+    position: relative;
+    padding-left: var(--spacing-lg);
+}
+
+.info-list li:last-child {
+    border-bottom: none;
+}
+
+.info-list li::before {
+    content: counter(step-counter);
+    counter-increment: step-counter;
+    position: absolute;
+    left: 0;
+    top: var(--spacing-sm);
+    width: 20px;
+    height: 20px;
+    background: var(--primary);
+    color: var(--surface);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Quick Agent Toggle */
+.quick-agent-toggle {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    justify-content: center;
+}
+
+.quick-agent-toggle:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.toggle-icon {
+    font-size: 16px;
+}
+
+/* Results */
+.results-card {
+    background: var(--surface);
+    border: 1px solid var(--outline);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--outline);
+}
+
+.results-content {
+    background: var(--surface-variant);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    line-height: 1.7;
+    color: var(--on-surface);
+    font-size: 15px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.result-success {
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    color: #0c4a6e;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.result-error {
+    background: #fef2f2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .agent-container {
+        padding: var(--spacing-md);
+    }
+    
+    .agent-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+    
+    .header-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .agent-title {
+        font-size: 24px;
+    }
+    
+    .agent-grid {
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+    
+    .widget-large,
+    .widget-small {
+        min-width: auto;
+        flex: none;
+    }
+    
+    .balance-amount {
+        font-size: 20px;
+    }
+    
+    .widget-large {
+        margin-right: 0 !important;
+    }
+}
+</style>
+
+<script>
+// Store agent data for form processing
+const agentData = {
+    slug: '{{ agent.slug }}',
+    name: '{{ agent.name }}',
+    price: parseFloat('{{ agent.price }}'),
+    formSchema: {{ agent_form_schema_json|safe }}
+};
+
+// Debug: Log the schema to console
+console.log('Agent Schema:', agentData.formSchema);
+
+// Initialize page when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Check authentication
+    if (!requireAuth()) return;
+    
+    // Render dynamic form
+    renderDynamicForm(agentData.formSchema);
+    
+    // Handle form submission
+    handleAgentFormSubmission();
+});
+
+async function loadWalletBalance() {
+    // Balance is already loaded from server, but this function is called after successful execution
+    // to refresh the balance. Use the same approach as the agent execution system.
+    try {
+        const response = await fetch('/api/auth/profile/', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            },
+            credentials: 'same-origin'
+        });
+        
+        if (response.ok) {
+            const user = await response.json();
+            if (user && typeof user.wallet_balance !== 'undefined') {
+                const balanceElement = document.getElementById('wallet-balance');
+                const oldBalance = parseFloat(balanceElement.textContent) || 0;
+                const newBalance = user.wallet_balance;
+                
+                // Add visual feedback for balance change
+                balanceElement.style.transition = 'all 0.3s ease';
+                balanceElement.style.transform = 'scale(1.05)';
+                balanceElement.style.color = 'var(--primary)';
+                
+                setTimeout(() => {
+                    balanceElement.textContent = newBalance.toFixed(2);
+                    setTimeout(() => {
+                        balanceElement.style.transform = 'scale(1)';
+                        balanceElement.style.color = '';
+                    }, 150);
+                }, 150);
+                
+                console.log(`Balance refreshed: ${oldBalance.toFixed(2)} AED → ${newBalance.toFixed(2)} AED`);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to refresh wallet balance:', error);
+    }
+}
+
+function renderDynamicForm(schema) {
+    const container = document.getElementById('dynamic-form-fields');
+    
+    console.log('Rendering form with schema:', schema);
+    
+    if (!schema) {
+        console.error('No schema provided');
+        container.innerHTML = '<p style="color: var(--error);">No schema provided for this agent.</p>';
+        return;
+    }
+    
+    if (!schema.fields) {
+        console.error('Schema has no fields property');
+        container.innerHTML = '<p style="color: var(--error);">Schema missing fields property.</p>';
+        return;
+    }
+    
+    if (!Array.isArray(schema.fields)) {
+        console.error('Schema fields is not an array:', schema.fields);
+        container.innerHTML = '<p style="color: var(--error);">Schema fields must be an array.</p>';
+        return;
+    }
+    
+    if (schema.fields.length === 0) {
+        console.error('Schema has no fields');
+        container.innerHTML = '<p style="color: var(--on-surface-variant);">No form fields configured for this agent.</p>';
+        return;
+    }
+    
+    let html = '';
+    
+    // Group fields by section (if they have a section property)
+    const sections = {};
+    schema.fields.forEach(field => {
+        const section = field.section || 'General';
+        if (!sections[section]) sections[section] = [];
+        sections[section].push(field);
+    });
+    
+    Object.keys(sections).forEach(sectionName => {
+        html += `<div class="section-container">`;
+        html += `<h4 class="section-subtitle">${sectionName}</h4>`;
+        
+        sections[sectionName].forEach(field => {
+            html += `<div class="form-group">`;
+            
+            // Field label
+            html += `<label class="form-label" for="${field.name}">
+                ${field.label || field.name}
+                ${field.required ? '<span style="color: var(--error);">*</span>' : ''}
+            </label>`;
+            
+            // Field input based on type
+            switch (field.type) {
+                case 'text':
+                case 'email':
+                case 'url':
+                case 'number':
+                    html += `<input type="${field.type}" 
+                        id="${field.name}" 
+                        name="${field.name}" 
+                        class="form-input"
+                        placeholder="${field.placeholder || ''}"
+                        ${field.required ? 'required' : ''}>`;
+                    break;
+                    
+                case 'textarea':
+                    html += `<textarea 
+                        id="${field.name}" 
+                        name="${field.name}" 
+                        class="form-textarea"
+                        placeholder="${field.placeholder || ''}"
+                        ${field.required ? 'required' : ''}></textarea>`;
+                    break;
+                    
+                case 'select':
+                    html += `<select id="${field.name}" name="${field.name}" class="form-control" ${field.required ? 'required' : ''}>`;
+                    if (!field.required) {
+                        html += `<option value="">Choose an option</option>`;
+                    }
+                    if (field.options && Array.isArray(field.options)) {
+                        field.options.forEach(option => {
+                            html += `<option value="${option}">${option}</option>`;
+                        });
+                    }
+                    html += `</select>`;
+                    break;
+                    
+                case 'checkbox':
+                    html += `<input type="checkbox" 
+                        id="${field.name}" 
+                        name="${field.name}" 
+                        value="true">`;
+                    break;
+                    
+                default:
+                    html += `<input type="text" 
+                        id="${field.name}" 
+                        name="${field.name}" 
+                        class="form-input"
+                        placeholder="${field.placeholder || ''}"
+                        ${field.required ? 'required' : ''}>`;
+            }
+            
+            // Field help text
+            if (field.help_text) {
+                html += `<div class="form-help">${field.help_text}</div>`;
+            }
+            
+            html += `</div>`;
+        });
+        
+        html += `</div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+function handleAgentFormSubmission() {
+    const form = document.getElementById('agent-form');
+    if (!form) return;
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '⏳ Processing...';
+        submitBtn.disabled = true;
+        
+        try {
+            // Collect form data
+            const formData = new FormData(form);
+            const inputData = {};
+            
+            for (const [key, value] of formData.entries()) {
+                if (key !== 'csrfmiddlewaretoken') {
+                    inputData[key] = value;
+                }
+            }
+            
+            // Execute agent
+            const result = await executeAgent(agentData.slug, inputData);
+            
+            // Show results
+            showResults(result);
+            
+            // Update wallet balance from the execution result
+            if (result.remaining_balance !== undefined) {
+                const balanceElement = document.getElementById('wallet-balance');
+                const oldBalance = parseFloat(balanceElement.textContent);
+                const newBalance = result.remaining_balance;
+                
+                // Add visual feedback for balance change
+                balanceElement.style.transition = 'all 0.3s ease';
+                balanceElement.style.transform = 'scale(1.1)';
+                balanceElement.style.color = 'var(--primary)';
+                
+                setTimeout(() => {
+                    balanceElement.textContent = newBalance.toFixed(2);
+                    setTimeout(() => {
+                        balanceElement.style.transform = 'scale(1)';
+                        balanceElement.style.color = '';
+                    }, 150);
+                }, 150);
+                
+                console.log(`Balance updated: ${oldBalance.toFixed(2)} AED → ${newBalance.toFixed(2)} AED`);
+            } else {
+                // Fallback: reload wallet balance from API
+                loadWalletBalance();
+            }
+            
+            // Success feedback is provided by result display and balance animation
+            
+        } catch (error) {
+            showMessage(error.message, 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+}
+
+function showResults(result) {
+    const container = document.getElementById('results-container');
+    const content = document.getElementById('results-content');
+    
+    let html = '';
+    
+    if (result.status === 'success') {
+        html += `<div class="result-success">
+            <strong>🎉 Success!</strong> Your ${agentData.name} has been generated successfully.
+        </div>`;
+        
+        if (result.output_data) {
+            html += formatAgentOutput(result.output_data, agentData.slug);
+        }
+    } else {
+        html += `<div class="result-error">
+            <strong>❌ Error:</strong> ${result.error_message || 'Agent execution failed'}
+        </div>`;
+    }
+    
+    content.innerHTML = html;
+    container.style.display = 'block';
+    
+    // Scroll to results
+    container.scrollIntoView({ behavior: 'smooth' });
+}
+
+function formatAgentOutput(outputData, agentSlug) {
+    let html = '';
+    
+    // Handle different output formats based on agent type
+    if (agentSlug === 'social-media-ad-creator') {
+        return formatSocialMediaAdOutput(outputData);
+    } else if (agentSlug === 'job-posting-creator') {
+        return formatJobPostingOutput(outputData);
+    } else if (agentSlug === 'blog-content-generator') {
+        return formatBlogContentOutput(outputData);
+    } else {
+        return formatGenericOutput(outputData);
+    }
+}
+
+function formatSocialMediaAdOutput(outputData) {
+    let content = '';
+    
+    // Extract the actual ad copy from the output
+    if (typeof outputData === 'object' && outputData.output) {
+        content = outputData.output;
+    } else if (typeof outputData === 'string') {
+        content = outputData;
+    } else if (outputData.ad_copy || outputData.content) {
+        content = outputData.ad_copy || outputData.content;
+    } else {
+        content = JSON.stringify(outputData, null, 2);
+    }
+    
+    // Clean up the content (remove "Ad Copy:" prefix if present)
+    content = content.replace(/^Ad Copy:\s*/i, '').trim();
+    
+    return `
+        <div style="background: var(--surface-variant); border-radius: var(--radius-md); padding: var(--spacing-xl); margin-top: var(--spacing-md); border-left: 4px solid var(--primary);">
+            <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+                <span style="font-size: 24px;">📱</span>
+                <h4 style="margin: 0; color: var(--on-surface); font-size: 18px; font-weight: 600;">Your Social Media Ad</h4>
+            </div>
+            <div style="background: var(--surface); padding: var(--spacing-lg); border-radius: var(--radius-sm); line-height: 1.7; font-size: 16px; color: var(--on-surface); white-space: pre-wrap; border: 1px solid var(--outline-variant);">
+${content}
+            </div>
+            <div style="margin-top: var(--spacing-md); padding: var(--spacing-sm); background: rgba(16, 185, 129, 0.1); border-radius: var(--radius-sm); font-size: 14px; color: var(--on-surface-variant);">
+                💡 <strong>Tip:</strong> This ad copy is optimized for your selected platform. You can copy it directly to your social media management tool or use it as inspiration for your campaign.
+            </div>
+        </div>
+    `;
+}
+
+function formatJobPostingOutput(outputData) {
+    let content = '';
+    
+    if (typeof outputData === 'object' && outputData.output) {
+        content = outputData.output;
+    } else if (typeof outputData === 'string') {
+        content = outputData;
+    } else {
+        content = JSON.stringify(outputData, null, 2);
+    }
+    
+    // Simple markdown cleanup - strip formatting but keep structure
+    const cleanContent = content
+        .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+        .replace(/^##?\s*/gm, '')        // Remove ## and ### headers
+        .replace(/^- /gm, '• ')          // Convert - to bullets
+        .trim();
+    
+    return `
+        <div style="background: var(--surface-variant); border-radius: var(--radius-md); padding: var(--spacing-xl); margin-top: var(--spacing-md); border-left: 4px solid var(--primary);">
+            <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+                <span style="font-size: 24px;">💼</span>
+                <h4 style="margin: 0; color: var(--on-surface); font-size: 18px; font-weight: 600;">Professional Job Posting</h4>
+            </div>
+            <div style="background: var(--surface); padding: var(--spacing-lg); border-radius: var(--radius-sm); line-height: 1.8; font-size: 15px; color: var(--on-surface); white-space: pre-line; border: 1px solid var(--outline-variant);">
+${cleanContent}
+            </div>
+            <div style="margin-top: var(--spacing-md); padding: var(--spacing-sm); background: rgba(79, 70, 229, 0.1); border-radius: var(--radius-sm); font-size: 14px; color: var(--on-surface-variant);">
+                💡 <strong>Tip:</strong> This job posting is ready to publish on job boards. You can copy it directly to LinkedIn, Indeed, or your company's careers page.
+            </div>
+        </div>
+    `;
+}
+
+function formatMarkdownToHTML(text) {
+    if (!text) return '';
+    
+    // Convert markdown formatting to HTML
+    let html = text
+        // Headers (## Header -> <h3>Header</h3>)
+        .replace(/^## (.+)$/gm, '<h3 style="font-size: 18px; font-weight: 600; margin: 24px 0 12px 0; color: var(--on-surface);">$1</h3>')
+        .replace(/^### (.+)$/gm, '<h4 style="font-size: 16px; font-weight: 600; margin: 20px 0 10px 0; color: var(--on-surface);">$1</h4>')
+        
+        // Bold text (**text** -> <strong>text</strong>)
+        .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: 600;">$1</strong>')
+        
+        // Bullet points (- item -> <li>item</li>)
+        .replace(/^- (.+)$/gm, '<li style="margin: 8px 0; padding-left: 8px;">$1</li>')
+        
+        // Wrap consecutive <li> elements in <ul>
+        .replace(/(<li[^>]*>.*<\/li>\s*)+/gs, '<ul style="margin: 16px 0; padding-left: 20px; list-style-type: disc;">$&</ul>')
+        
+        // Line breaks (double newlines -> paragraphs)
+        .split('\n\n')
+        .map(paragraph => {
+            paragraph = paragraph.trim();
+            if (!paragraph) return '';
+            if (paragraph.includes('<h3>') || paragraph.includes('<h4>') || paragraph.includes('<ul>')) {
+                return paragraph;
+            }
+            return `<p style="margin: 16px 0; line-height: 1.6;">${paragraph}</p>`;
+        })
+        .join('')
+        
+        // Clean up extra spaces and newlines
+        .replace(/\n/g, '<br>');
+    
+    return html;
+}
+
+function formatBlogContentOutput(outputData) {
+    let content = '';
+    
+    if (typeof outputData === 'object' && outputData.output) {
+        content = outputData.output;
+    } else if (typeof outputData === 'string') {
+        content = outputData;
+    } else {
+        content = JSON.stringify(outputData, null, 2);
+    }
+    
+    // Convert markdown-style formatting to HTML
+    const formattedContent = formatMarkdownToHTML(content);
+    
+    return `
+        <div style="background: var(--surface-variant); border-radius: var(--radius-md); padding: var(--spacing-xl); margin-top: var(--spacing-md); border-left: 4px solid var(--primary);">
+            <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+                <span style="font-size: 24px;">📝</span>
+                <h4 style="margin: 0; color: var(--on-surface); font-size: 18px; font-weight: 600;">Blog Content</h4>
+            </div>
+            <div style="background: var(--surface); padding: var(--spacing-lg); border-radius: var(--radius-sm); line-height: 1.8; font-size: 15px; color: var(--on-surface); border: 1px solid var(--outline-variant);">
+                ${formattedContent}
+            </div>
+            <div style="margin-top: var(--spacing-md); padding: var(--spacing-sm); background: rgba(34, 197, 94, 0.1); border-radius: var(--radius-sm); font-size: 14px; color: var(--on-surface-variant);">
+                💡 <strong>Tip:</strong> This blog content is SEO-optimized and ready to publish. You can copy it directly to your CMS or blogging platform.
+            </div>
+        </div>
+    `;
+}
+
+function formatGenericOutput(outputData) {
+    let content = '';
+    
+    if (typeof outputData === 'object') {
+        // Try to extract common fields
+        if (outputData.output) {
+            content = outputData.output;
+        } else if (outputData.result) {
+            content = outputData.result;
+        } else if (outputData.content) {
+            content = outputData.content;
+        } else {
+            // Format as readable JSON
+            content = JSON.stringify(outputData, null, 2);
+        }
+    } else {
+        content = String(outputData);
+    }
+    
+    return `
+        <div style="background: var(--surface-variant); border-radius: var(--radius-md); padding: var(--spacing-xl); margin-top: var(--spacing-md); border-left: 4px solid var(--primary);">
+            <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+                <span style="font-size: 24px;">🤖</span>
+                <h4 style="margin: 0; color: var(--on-surface); font-size: 18px; font-weight: 600;">AI Generated Result</h4>
+            </div>
+            <div style="background: var(--surface); padding: var(--spacing-lg); border-radius: var(--radius-sm); line-height: 1.7; font-size: 15px; color: var(--on-surface); white-space: pre-wrap; border: 1px solid var(--outline-variant); font-family: ${content.includes('{') || content.includes('[') ? 'Monaco, Consolas, monospace' : 'inherit'};">
+${content}
+            </div>
+        </div>
+    `;
+}
+
+function copyResults() {
+    const content = document.getElementById('results-content');
+    
+    // Get clean text content, preserving line breaks and structure
+    let text = '';
+    
+    // Walk through the DOM and extract text with proper formatting
+    function extractText(element) {
+        let result = '';
+        for (let node of element.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                result += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                const tagName = node.tagName.toLowerCase();
+                
+                if (tagName === 'h3') {
+                    result += '\n\n' + node.textContent + '\n';
+                } else if (tagName === 'h4') {
+                    result += '\n' + node.textContent + '\n';
+                } else if (tagName === 'p') {
+                    result += '\n' + node.textContent + '\n';
+                } else if (tagName === 'li') {
+                    result += '\n• ' + node.textContent;
+                } else if (tagName === 'ul') {
+                    result += extractText(node) + '\n';
+                } else if (tagName === 'br') {
+                    result += '\n';
+                } else {
+                    result += extractText(node);
+                }
+            }
+        }
+        return result;
+    }
+    
+    text = extractText(content).trim();
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            // Subtle visual feedback: briefly change button text
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '✓ Copied!';
+            button.style.background = 'var(--success)';
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.background = '';
+            }, 1500);
+        }).catch(() => {
+            showMessage('Failed to copy content', 'error');
+        });
+    } else {
+        showMessage('Clipboard not supported', 'error');
+    }
+}
+
+function downloadResults() {
+    const content = document.getElementById('results-content');
+    const text = content.innerText || content.textContent || '';
+    
+    try {
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${agentData.slug}-results-${Date.now()}.txt`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        // Subtle visual feedback: briefly change button text
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = '✓ Downloaded!';
+        button.style.background = 'var(--success)';
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.style.background = '';
+        }, 1500);
+    } catch (error) {
+        console.error('Download failed:', error);
+        showMessage('Failed to download results', 'error');
+    }
+}
+
+function resetForm() {
+    document.getElementById('agent-form').reset();
+    document.getElementById('results-container').style.display = 'none';
+    // Visual feedback: form is cleared, results hidden - no message needed
+}
+
+// Page is ready - no need for welcome message
+</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NetCop AI Agent{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">NetCop AI</a>
+            <div class="nav-links">
+                {% if user.is_authenticated %}
+                    <a href="/dashboard/" class="nav-link">Dashboard</a>
+                    <a href="/agents/" class="nav-link">Agents</a>
+                    <a href="/wallet/" class="nav-link">Wallet</a>
+                    <a href="/workflows/" class="nav-link">Workflows</a>
+                    <button onclick="logout()" class="nav-button">Logout</button>
+                {% else %}
+                    <a href="/login/" class="nav-link">Login</a>
+                    <a href="/register/" class="nav-button">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <p>&copy; 2025 NetCop AI Agent. Built with Django & minimal design.</p>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

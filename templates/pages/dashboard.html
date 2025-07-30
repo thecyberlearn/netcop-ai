@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - NetCop AI Agent{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1>Dashboard</h1>
+    <div style="display: flex; gap: 1rem;">
+        <a href="/wallet/" class="btn btn-secondary">Manage Wallet</a>
+        <a href="/workflows/" class="btn btn-primary">Trigger Workflow</a>
+    </div>
+</div>
+
+<!-- User Profile & Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value" id="walletBalance">$0.00</div>
+        <div class="stat-label">Wallet Balance</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="totalWorkflows">0</div>
+        <div class="stat-label">Workflows Executed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="totalSpent">$0.00</div>
+        <div class="stat-label">Total Spent</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="userEmail">Loading...</div>
+        <div class="stat-label">Account Email</div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Quick Actions</h3>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <a href="/wallet/" class="btn btn-secondary" style="text-align: center; padding: 1.5rem;">
+            💳<br>Top Up Wallet
+        </a>
+        <a href="/workflows/" class="btn btn-secondary" style="text-align: center; padding: 1.5rem;">
+            ⚡<br>Trigger Workflow
+        </a>
+        <a href="/wallet/" class="btn btn-secondary" style="text-align: center; padding: 1.5rem;">
+            📊<br>View Transactions
+        </a>
+        <a href="/workflows/" class="btn btn-secondary" style="text-align: center; padding: 1.5rem;">
+            📝<br>Workflow History
+        </a>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Transactions</h3>
+        </div>
+        <div id="recentTransactions">
+            <p style="text-align: center; color: var(--gray-600); padding: 2rem;">Loading transactions...</p>
+        </div>
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="/wallet/" class="btn btn-secondary">View All</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Workflows</h3>
+        </div>
+        <div id="recentWorkflows">
+            <p style="text-align: center; color: var(--gray-600); padding: 2rem;">Loading workflow history...</p>
+        </div>
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="/workflows/" class="btn btn-secondary">View All</a>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    
+    try {
+        // Load user profile
+        const profile = await api.get('/auth/profile/');
+        document.getElementById('userEmail').textContent = profile.email;
+        document.getElementById('walletBalance').textContent = formatCurrency(profile.wallet_balance);
+
+        // Load recent transactions
+        const transactions = await api.get('/wallet/transactions/');
+        displayRecentTransactions(transactions.slice(0, 5));
+
+        // Load recent workflows
+        const workflows = await api.get('/workflows/history/');
+        displayRecentWorkflows(workflows.slice(0, 5));
+
+        // Calculate stats
+        const totalWorkflows = workflows.length;
+        const totalSpent = workflows.reduce((sum, w) => sum + parseFloat(w.fee_charged), 0);
+        
+        document.getElementById('totalWorkflows').textContent = totalWorkflows;
+        document.getElementById('totalSpent').textContent = formatCurrency(totalSpent);
+
+    } catch (error) {
+        showMessage('Failed to load dashboard data: ' + error.message, 'error');
+    }
+});
+
+function displayRecentTransactions(transactions) {
+    const container = document.getElementById('recentTransactions');
+    
+    if (transactions.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No transactions yet</p>';
+        return;
+    }
+
+    container.innerHTML = transactions.map(transaction => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--gray-200);">
+            <div>
+                <div style="font-weight: 500; text-transform: capitalize;">${transaction.transaction_type}</div>
+                <div style="font-size: 0.875rem; color: var(--gray-600);">${formatDate(transaction.created_at)}</div>
+            </div>
+            <div style="font-weight: 600; color: ${transaction.transaction_type === 'deposit' ? 'var(--gray-700)' : 'var(--gray-500)'};">
+                ${transaction.transaction_type === 'deposit' ? '+' : '-'}${formatCurrency(transaction.amount)}
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayRecentWorkflows(workflows) {
+    const container = document.getElementById('recentWorkflows');
+    
+    if (workflows.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No workflows executed yet</p>';
+        return;
+    }
+
+    container.innerHTML = workflows.map(workflow => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--gray-200);">
+            <div>
+                <div style="font-weight: 500;">${workflow.workflow_name}</div>
+                <div style="font-size: 0.875rem; color: var(--gray-600);">${formatDate(workflow.created_at)}</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 12px; background: ${getStatusColor(workflow.status)};">
+                    ${workflow.status}
+                </span>
+                <span style="font-weight: 600;">${formatCurrency(workflow.fee_charged)}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getStatusColor(status) {
+    switch (status) {
+        case 'success': return 'var(--gray-100)';
+        case 'failed': return 'var(--gray-200)';
+        case 'pending': return 'var(--gray-50)';
+        default: return 'var(--gray-100)';
+    }
+}
+</script>
+{% endblock %}

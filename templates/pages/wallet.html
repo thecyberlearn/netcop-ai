@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Wallet - NetCop AI Agent{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1>Wallet</h1>
+    <a href="/dashboard/" class="btn btn-secondary">← Back to Dashboard</a>
+</div>
+
+<!-- Wallet Balance -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Current Balance</h3>
+    </div>
+    <div style="text-align: center; padding: 2rem 0;">
+        <div style="font-size: 3rem; font-weight: 700; color: var(--black); margin-bottom: 1rem;" id="walletBalance">
+            0.00 AED
+        </div>
+        <button onclick="showTopUpForm()" class="btn btn-primary">
+            Top Up Wallet
+        </button>
+    </div>
+</div>
+
+<!-- Top Up Form (Hidden by default) -->
+<div id="topUpForm" class="card" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Top Up Wallet</h3>
+        <p style="color: var(--gray-600); margin: 0;">Add funds to your wallet using Stripe Checkout</p>
+    </div>
+    
+    <form id="topUpFormElement">
+        <div class="form-group">
+            <label for="amount" class="form-label">Amount (AED)</label>
+            <input 
+                type="number" 
+                id="amount" 
+                name="amount" 
+                class="form-input" 
+                required
+                min="1"
+                step="0.01"
+                placeholder="10.00"
+            >
+        </div>
+        
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" class="btn btn-primary">
+                Proceed to Checkout
+            </button>
+            <button type="button" onclick="hideTopUpForm()" class="btn btn-secondary">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Transaction History -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Transaction History</h3>
+    </div>
+    
+    <div id="transactionHistory">
+        <p style="text-align: center; color: var(--gray-600); padding: 2rem;">Loading transactions...</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    
+    await loadWalletData();
+    
+    // Set up top-up form
+    handleFormSubmit('#topUpFormElement', async (data) => {
+        const response = await api.post('/wallet/top-up/', { amount: parseFloat(data.amount) });
+        
+        if (response.checkout_url) {
+            showMessage('Redirecting to Stripe Checkout...', 'success');
+            window.location.href = response.checkout_url;
+        } else {
+            throw new Error('Failed to create checkout session');
+        }
+    });
+});
+
+async function loadWalletData() {
+    try {
+        // Load user profile for balance
+        const profile = await api.get('/auth/profile/');
+        document.getElementById('walletBalance').textContent = profile.wallet_balance.toFixed(2) + ' AED';
+
+        // Load transaction history
+        const transactions = await api.get('/wallet/transactions/');
+        displayTransactionHistory(transactions);
+
+    } catch (error) {
+        showMessage('Failed to load wallet data: ' + error.message, 'error');
+    }
+}
+
+function displayTransactionHistory(transactions) {
+    const container = document.getElementById('transactionHistory');
+    
+    if (transactions.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No transactions yet</p>';
+        return;
+    }
+
+    const tableHTML = `
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Description</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${transactions.map(transaction => `
+                    <tr>
+                        <td style="text-transform: capitalize; font-weight: 500;">
+                            ${getTransactionIcon(transaction.transaction_type)} ${transaction.transaction_type}
+                        </td>
+                        <td style="font-weight: 600; color: ${getAmountColor(transaction.transaction_type)};">
+                            ${transaction.transaction_type === 'deposit' ? '+' : '-'}${parseFloat(transaction.amount).toFixed(2)} AED
+                        </td>
+                        <td>
+                            <span style="font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 12px; background: ${getStatusBg(transaction.status)}; text-transform: capitalize;">
+                                ${transaction.status}
+                            </span>
+                        </td>
+                        <td style="color: var(--gray-600);">
+                            ${transaction.description || '-'}
+                        </td>
+                        <td style="color: var(--gray-600); font-size: 0.875rem;">
+                            ${formatDate(transaction.created_at)}
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    
+    container.innerHTML = tableHTML;
+}
+
+function getTransactionIcon(type) {
+    switch (type) {
+        case 'deposit': return '💳';
+        case 'withdrawal': return '💸';
+        case 'fee': return '⚡';
+        default: return '📝';
+    }
+}
+
+function getAmountColor(type) {
+    return type === 'deposit' ? 'var(--gray-700)' : 'var(--gray-500)';
+}
+
+function getStatusBg(status) {
+    switch (status) {
+        case 'completed': return 'var(--gray-100)';
+        case 'failed': return 'var(--gray-200)';
+        case 'pending': return 'var(--gray-50)';
+        default: return 'var(--gray-100)';
+    }
+}
+
+function showTopUpForm() {
+    document.getElementById('topUpForm').style.display = 'block';
+    document.getElementById('amount').focus();
+}
+
+function hideTopUpForm() {
+    document.getElementById('topUpForm').style.display = 'none';
+    document.getElementById('topUpFormElement').reset();
+}
+
+// Handle returning from Stripe (success/cancel)
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('success') === 'true') {
+    // Visual feedback: wallet balance will show updated amount
+    loadWalletData(); // Refresh data
+} else if (urlParams.get('canceled') === 'true') {
+    showMessage('Payment was canceled', 'error');
+}
+</script>
+{% endblock %}

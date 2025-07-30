@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Workflows - NetCop AI Agent{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1>Workflows</h1>
+    <a href="/dashboard/" class="btn btn-secondary">← Back to Dashboard</a>
+</div>
+
+<!-- Workflow Trigger Form -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Trigger Workflow</h3>
+        <p style="color: var(--gray-600); margin: 0;">
+            Execute n8n workflows with custom data. Each execution costs $0.10.
+        </p>
+    </div>
+    
+    <div style="background: var(--gray-50); padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 500;">Current Balance:</span>
+            <span style="font-size: 1.25rem; font-weight: 600;" id="walletBalance">$0.00</span>
+        </div>
+        <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.5rem;">
+            Sufficient for <span id="executionsRemaining">0</span> workflow executions
+        </div>
+    </div>
+    
+    <form id="workflowForm">
+        <div class="form-group">
+            <label for="workflow_name" class="form-label">Workflow Name</label>
+            <input 
+                type="text" 
+                id="workflow_name" 
+                name="workflow_name" 
+                class="form-input" 
+                required
+                placeholder="my-workflow"
+                pattern="[a-zA-Z0-9-_]+"
+                title="Only letters, numbers, hyphens, and underscores allowed"
+            >
+            <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.25rem;">
+                This should match your n8n webhook endpoint name
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="workflow_data" class="form-label">Workflow Data (JSON)</label>
+            <textarea 
+                id="workflow_data" 
+                name="workflow_data" 
+                class="form-input form-textarea" 
+                placeholder='{"key": "value", "message": "Hello World"}'
+                style="font-family: 'Monaco', 'Consolas', monospace; font-size: 0.875rem;"
+            ></textarea>
+            <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.25rem;">
+                Optional: Custom data to pass to your workflow (must be valid JSON)
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <button type="submit" class="btn btn-primary">
+                Execute Workflow ($0.10)
+            </button>
+            <button type="button" onclick="validateJSON()" class="btn btn-secondary">
+                Validate JSON
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Workflow History -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Execution History</h3>
+    </div>
+    
+    <div id="workflowHistory">
+        <p style="text-align: center; color: var(--gray-600); padding: 2rem;">Loading workflow history...</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    
+    await loadWorkflowData();
+    
+    // Set up workflow form
+    handleFormSubmit('#workflowForm', async (data) => {
+        // Validate JSON if provided
+        let workflowData = {};
+        if (data.workflow_data.trim()) {
+            try {
+                workflowData = JSON.parse(data.workflow_data);
+            } catch (error) {
+                throw new Error('Invalid JSON data. Please check your syntax.');
+            }
+        }
+        
+        const response = await api.post(`/workflows/trigger/${data.workflow_name}/`, {
+            data: workflowData
+        });
+        
+        if (response.success) {
+            showMessage(`Workflow "${data.workflow_name}" executed successfully!`, 'success');
+        } else {
+            showMessage(`Workflow failed: ${response.error || 'Unknown error'}`, 'error');
+        }
+        
+        // Reset form and reload data
+        document.getElementById('workflowForm').reset();
+        await loadWorkflowData();
+    });
+});
+
+async function loadWorkflowData() {
+    try {
+        // Load user profile for balance
+        const profile = await api.get('/auth/profile/');
+        const balance = parseFloat(profile.wallet_balance);
+        const executionsRemaining = Math.floor(balance / 0.10);
+        
+        document.getElementById('walletBalance').textContent = formatCurrency(balance);
+        document.getElementById('executionsRemaining').textContent = executionsRemaining;
+
+        // Load workflow history
+        const workflows = await api.get('/workflows/history/');
+        displayWorkflowHistory(workflows);
+
+    } catch (error) {
+        showMessage('Failed to load workflow data: ' + error.message, 'error');
+    }
+}
+
+function displayWorkflowHistory(workflows) {
+    const container = document.getElementById('workflowHistory');
+    
+    if (workflows.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No workflows executed yet</p>';
+        return;
+    }
+
+    const tableHTML = `
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Workflow</th>
+                    <th>Status</th>
+                    <th>Fee</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${workflows.map(workflow => `
+                    <tr>
+                        <td style="font-weight: 500;">${workflow.workflow_name}</td>
+                        <td>
+                            <span style="font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 12px; background: ${getStatusBg(workflow.status)}; text-transform: capitalize;">
+                                ${getStatusIcon(workflow.status)} ${workflow.status}
+                            </span>
+                        </td>
+                        <td style="font-weight: 600;">${formatCurrency(workflow.fee_charged)}</td>
+                        <td style="color: var(--gray-600); font-size: 0.875rem;">
+                            ${formatDate(workflow.created_at)}
+                        </td>
+                        <td>
+                            <button onclick="showWorkflowDetails('${workflow.id}')" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                                Details
+                            </button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    
+    container.innerHTML = tableHTML;
+}
+
+function getStatusIcon(status) {
+    switch (status) {
+        case 'success': return '✅';
+        case 'failed': return '❌';
+        case 'pending': return '⏳';
+        default: return '📝';
+    }
+}
+
+function getStatusBg(status) {
+    switch (status) {
+        case 'success': return 'var(--gray-100)';
+        case 'failed': return 'var(--gray-200)';
+        case 'pending': return 'var(--gray-50)';
+        default: return 'var(--gray-100)';
+    }
+}
+
+function validateJSON() {
+    const textarea = document.getElementById('workflow_data');
+    const data = textarea.value.trim();
+    
+    if (!data) {
+        showMessage('JSON data is empty - this is valid for workflows that don\'t need input data.', 'success');
+        return;
+    }
+    
+    try {
+        JSON.parse(data);
+        showMessage('JSON is valid!', 'success');
+    } catch (error) {
+        showMessage('Invalid JSON: ' + error.message, 'error');
+        textarea.focus();
+    }
+}
+
+async function showWorkflowDetails(workflowId) {
+    try {
+        const workflows = await api.get('/workflows/history/');
+        const workflow = workflows.find(w => w.id === workflowId);
+        
+        if (!workflow) {
+            showMessage('Workflow not found', 'error');
+            return;
+        }
+        
+        const details = `
+            <div style="background: var(--white); border: 1px solid var(--gray-300); border-radius: 8px; padding: 1.5rem; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-lg);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--gray-200); padding-bottom: 1rem;">
+                    <h3 style="margin: 0;">Workflow Details</h3>
+                    <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <strong>Name:</strong> ${workflow.workflow_name}<br>
+                    <strong>Status:</strong> ${workflow.status}<br>
+                    <strong>Fee:</strong> ${formatCurrency(workflow.fee_charged)}<br>
+                    <strong>Date:</strong> ${formatDate(workflow.created_at)}
+                </div>
+                
+                ${workflow.request_data ? `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Request Data:</strong>
+                        <pre style="background: var(--gray-50); padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.875rem;">${JSON.stringify(workflow.request_data, null, 2)}</pre>
+                    </div>
+                ` : ''}
+                
+                ${workflow.response_data ? `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Response Data:</strong>
+                        <pre style="background: var(--gray-50); padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.875rem;">${JSON.stringify(workflow.response_data, null, 2)}</pre>
+                    </div>
+                ` : ''}
+                
+                ${workflow.error_message ? `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Error:</strong>
+                        <div style="background: var(--gray-100); padding: 1rem; border-radius: 4px; color: var(--gray-800);">${workflow.error_message}</div>
+                    </div>
+                ` : ''}
+            </div>
+            <div onclick="closeModal()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999;"></div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', details);
+        
+    } catch (error) {
+        showMessage('Failed to load workflow details: ' + error.message, 'error');
+    }
+}
+
+function closeModal() {
+    const modals = document.querySelectorAll('[style*="z-index: 1000"], [style*="z-index: 999"]');
+    modals.forEach(modal => modal.remove());
+}
+</script>
+{% endblock %}

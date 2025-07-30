@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}NetCop AI Agent - Secure Workflow Automation{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1 class="hero-title">NetCop AI Agent</h1>
+    <p class="hero-subtitle">
+        Secure, pay-per-use workflow automation platform. 
+        Top up your wallet, trigger powerful n8n workflows, and monitor your usage—all with a sleek, minimal interface.
+    </p>
+    <div class="hero-buttons">
+        <a href="/register/" class="btn btn-primary">Get Started</a>
+        <a href="/login/" class="btn btn-secondary">Sign In</a>
+    </div>
+</section>
+
+<section class="features">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">$0.10</div>
+            <div class="stat-label">Per Workflow</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">100%</div>
+            <div class="stat-label">Secure</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">24/7</div>
+            <div class="stat-label">Available</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">How it Works</h3>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+            <div>
+                <h4>1. Create Account</h4>
+                <p>Sign up with your email and create a secure account in seconds.</p>
+            </div>
+            <div>
+                <h4>2. Top Up Wallet</h4>
+                <p>Add funds to your wallet using our secure Stripe integration.</p>
+            </div>
+            <div>
+                <h4>3. Trigger Workflows</h4>
+                <p>Execute powerful n8n workflows with custom data. Pay only $0.10 per execution.</p>
+            </div>
+            <div>
+                <h4>4. Monitor Usage</h4>
+                <p>Track all your transactions and workflow executions in real-time.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Features</h3>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+            <div>
+                <h4>🔐 Secure Authentication</h4>
+                <p>Token-based authentication with email verification and secure password handling.</p>
+            </div>
+            <div>
+                <h4>💳 Stripe Integration</h4>
+                <p>Secure payment processing with Stripe Checkout for wallet top-ups.</p>
+            </div>
+            <div>
+                <h4>⚡ n8n Workflows</h4>
+                <p>Trigger powerful automation workflows with custom JSON data.</p>
+            </div>
+            <div>
+                <h4>📊 Usage Tracking</h4>
+                <p>Comprehensive logging of all transactions and workflow executions.</p>
+            </div>
+            <div>
+                <h4>🎛️ Admin Dashboard</h4>
+                <p>Full administrative interface for monitoring users and system health.</p>
+            </div>
+            <div>
+                <h4>📱 Responsive Design</h4>
+                <p>Clean, minimal interface that works perfectly on all devices.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
